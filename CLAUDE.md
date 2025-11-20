@@ -1,449 +1,388 @@
-# Google Gemini API Configuration Guide
+# AIRDRAW - Project Setup & Architecture Guide
 
-This document provides detailed configuration and setup instructions for integrating Google Gemini AI into the AIRDRAW application.
+This document provides comprehensive setup instructions and architecture details for the AIRDRAW application.
 
-## Overview
+## Project Overview
 
-AIRDRAW uses **Google Gemini 2.5 Flash** as its AI analysis engine to interpret user drawings and provide enthusiastic, constructive feedback in the style of a Pictionary game.
+AIRDRAW is a secure, AI-powered gesture drawing application that combines:
 
-## API Details
+- **Google MediaPipe Hand Landmarker** for real-time hand tracking
+- **Google Gemini 2.5 Flash** for AI drawing analysis (via serverless functions)
+- **React 19** with TypeScript for the frontend
+- **Netlify Functions** for secure API key management
 
-### Model Information
+## Security Architecture
 
-- **Model Name**: Gemini 2.5 Flash
-- **Model ID**: `gemini-2.5-flash`
-- **Provider**: Google AI Studio
-- **API Version**: Latest (2025)
-- **SDK Library**: `@google/genai` v1.30.0
+**IMPORTANT**: This project uses **Netlify Functions** to keep the Gemini API key secure. The API key is **NEVER exposed** to the client-side JavaScript.
 
-### Key Features
-
-- **Multimodal Input**: Supports text and images
-- **Fast Response**: Optimized for quick inference (1-3 seconds)
-- **Vision Capabilities**: Advanced image understanding
-- **Cost-Effective**: Flash variant optimized for performance/cost balance
-
-## Getting Your API Key
-
-### Step 1: Create Google Account
-
-Ensure you have a Google account. If not, create one at [accounts.google.com](https://accounts.google.com).
-
-### Step 2: Access Google AI Studio
-
-1. Navigate to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Sign in with your Google account
-3. Accept the terms of service if prompted
-
-### Step 3: Generate API Key
-
-1. Click **"Create API Key"** button
-2. Select or create a Google Cloud project (or use "Quickstart")
-3. Copy the generated API key
-4. Store it securely - you won't be able to see it again
-
-### Step 4: Configure Environment
-
-Create a `.env.local` file in the project root:
-
-```bash
-# .env.local
-API_KEY=AIzaSy...your_actual_api_key_here
-```
-
-**Important**: Never commit `.env.local` to version control. It's already in `.gitignore`.
-
-## Installation
-
-### Install SDK
-
-Using Yarn (recommended):
-
-```bash
-yarn add @google/genai
-```
-
-Using npm:
-
-```bash
-npm install @google/genai
-```
-
-### Verify Installation
-
-Check that the package is listed in `package.json`:
-
-```json
-{
-  "dependencies": {
-    "@google/genai": "^1.30.0"
-  }
-}
-```
-
-## Configuration
-
-### Environment Variable Loading
-
-Vite automatically loads environment variables from `.env.local`:
-
-```typescript
-// Accessed in code as:
-const apiKey = import.meta.env.VITE_API_KEY;
-```
-
-**Note**: Current implementation uses `API_KEY` directly (requires Vite config adjustment for production).
-
-### SDK Initialization
-
-The Gemini client is initialized in [services/geminiService.ts](services/geminiService.ts):
-
-```typescript
-import { GoogleGenerativeAI } from '@google/genai';
-
-const apiKey = import.meta.env.API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-```
-
-## Usage in AIRDRAW
-
-### Main Function: analyzeDrawing
-
-Located in [services/geminiService.ts](services/geminiService.ts):
-
-```typescript
-export async function analyzeDrawing(dataUrl: string): Promise<string> {
-  try {
-    // Extract base64 image data
-    const base64Data = dataUrl.split(',')[1];
-
-    // Create prompt
-    const prompt = "You are an art critic playing Pictionary. " +
-                   "Briefly guess what this drawing represents. " +
-                   "Be enthusiastic and constructive. Keep it under 30 words.";
-
-    // Send to Gemini
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: "image/png",
-          data: base64Data
-        }
-      }
-    ]);
-
-    return result.response.text();
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Oops! I had trouble analyzing your drawing. Please try again!";
-  }
-}
-```
-
-### Request Flow
-
-1. **User Action**: Clicks "GUESS DRAWING" button in UI
-2. **Canvas Capture**: Canvas converted to base64 PNG via `canvas.toDataURL("image/png")`
-3. **API Call**: `analyzeDrawing()` sends image + prompt to Gemini
-4. **Processing**: Gemini analyzes image and generates response
-5. **Response**: Text interpretation returned to UI
-6. **Display**: Result shown in toast notification
-
-## Prompt Engineering
-
-### Current Prompt
+### Architecture Flow
 
 ```text
-You are an art critic playing Pictionary. Briefly guess what this drawing represents.
-Be enthusiastic and constructive. Keep it under 30 words.
+Browser → Netlify Function → Gemini API
+  (no API key)    (has API key)    (receives request)
 ```
 
-### Prompt Design Principles
+### Why Serverless Functions?
 
-- **Role Definition**: "art critic playing Pictionary" sets the tone
-- **Task Clarity**: "guess what this drawing represents" defines the goal
-- **Tone Guidance**: "enthusiastic and constructive" ensures positive feedback
-- **Length Constraint**: "under 30 words" keeps responses concise
+- ✅ **API key stays server-side** - Never exposed in client JavaScript
+- ✅ **Rate limiting** - Can implement per-user limits
+- ✅ **Request validation** - Verify image data before sending to Gemini
+- ✅ **Cost control** - Monitor and limit API usage
+- ✅ **Production-ready** - Same architecture works locally and in production
 
-### Customization Ideas
+## Environment Setup
 
-You can modify the prompt for different use cases:
+### Prerequisites
 
-**Educational Mode**:
+- **Node.js**: v20 or higher (specified in `.nvmrc`)
+- **Yarn**: v1.22 or higher (package manager)
+- **Google Gemini API Key**: From [Google AI Studio](https://aistudio.google.com/app/apikey)
+- **Desktop device** with webcam
+- **Modern browser**: Chrome, Firefox, Safari, or Edge
 
-```text
-You are a supportive art teacher. Analyze this drawing and provide
-encouragement with specific observations. Keep it under 30 words.
-```
+### Installation
 
-**Detailed Analysis**:
+1. **Clone the repository**:
 
-```text
-Describe this drawing in detail, noting colors, shapes, composition,
-and potential subject matter. Be specific and analytical. 50 words max.
-```
-
-**Game Mode**:
-
-```text
-You're playing Pictionary! Make your best guess at what this drawing is
-in 3 words or less. Be confident and fun!
-```
-
-## API Limits & Quotas
-
-### Free Tier Limits
-
-As of 2025, Google AI Studio provides:
-
-- **Requests per minute (RPM)**: 15
-- **Requests per day (RPD)**: 1,500
-- **Tokens per minute (TPM)**: 1 million
-
-### Rate Limiting Handling
-
-The current implementation doesn't explicitly handle rate limits. For production:
-
-```typescript
-// Add cooldown between requests
-let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 4000; // 4 seconds
-
-export async function analyzeDrawing(dataUrl: string): Promise<string> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
-
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-    return "Please wait a moment before analyzing again!";
-  }
-
-  lastRequestTime = now;
-  // ... rest of implementation
-}
-```
-
-### Cost Considerations
-
-Gemini 2.5 Flash pricing (as of 2025):
-
-- **Input**: $0.075 per million tokens
-- **Output**: $0.30 per million tokens
-- **Images**: Counted as ~258 tokens per image
-
-For typical AIRDRAW usage (small drawings), costs are minimal in development.
-
-## Error Handling
-
-### Common Errors
-
-#### 1. Invalid API Key
-
-```typescript
-Error: API key not valid
-```
-
-Solution: Verify API key in `.env.local` and restart dev server.
-
-#### 2. Rate Limit Exceeded
-
-```typescript
-Error: 429 Too Many Requests
-```
-
-Solution: Implement cooldown period between requests.
-
-#### 3. Network Error
-
-```typescript
-Error: Failed to fetch
-```
-
-Solution: Check internet connection and API endpoint availability.
-
-#### 4. Invalid Image Format
-
-```typescript
-Error: Invalid inline data
-```
-
-Solution: Ensure canvas data is valid base64 PNG.
-
-### Graceful Degradation
-
-Always provide fallback messages:
-
-```typescript
-try {
-  return await performAnalysis();
-} catch (error) {
-  if (error.message.includes('429')) {
-    return "Too many requests! Please wait a moment and try again.";
-  }
-  return "Oops! Something went wrong. Please try again!";
-}
-```
-
-## Security Best Practices
-
-### Production Recommendations
-
-1. **Never Expose API Keys**
-   - Don't commit `.env.local` to git
-   - Don't expose keys in client-side code
-   - Use server-side proxy for production
-
-2. **Implement Server-Side Proxy**
-
-   ```typescript
-   // Instead of calling Gemini directly from browser:
-   // client → your-api-server → Gemini
-
-   // Example server endpoint:
-   app.post('/api/analyze', async (req, res) => {
-     const { imageData } = req.body;
-     const result = await analyzeDrawing(imageData);
-     res.json({ result });
-   });
+   ```bash
+   git clone https://github.com/sambitcreate/aidraw.git
+   cd airdraw-studio
    ```
 
-3. **Add Request Validation**
-   - Verify image size limits
-   - Check request frequency per user
-   - Sanitize input data
+2. **Install dependencies**:
 
-4. **Monitor Usage**
-   - Track API calls
-   - Set up alerts for quota limits
-   - Log errors for debugging
+   ```bash
+   yarn install
+   ```
 
-## Testing
+3. **Create environment file**:
 
-### Manual Testing
+   Create `.env.local` in the project root:
 
-1. Start dev server: `yarn dev`
-2. Draw something on canvas
-3. Click "GUESS DRAWING"
-4. Verify response appears in toast
+   ```bash
+   # .env.local
+   # Server-side only - NOT exposed to client
+   GEMINI_API_KEY=your_api_key_here
+   ```
 
-### Testing Different Prompts
+   **Note**: The variable is `GEMINI_API_KEY` (no `VITE_` prefix), which keeps it server-side only.
 
-Modify the prompt in `geminiService.ts` to test variations:
+4. **Run development server**:
 
-```typescript
-const prompts = {
-  standard: "You are an art critic...",
-  detailed: "Provide detailed analysis...",
-  brief: "In 5 words or less..."
-};
+   ```bash
+   yarn dev
+   ```
 
-// Use different prompts for testing
-const prompt = prompts.detailed;
+   This starts **Netlify Dev** on `http://localhost:8888` which includes:
+   - Vite dev server
+   - Serverless functions
+   - Environment variables
+   - Full production simulation
+
+## Project Structure
+
+```text
+airdraw-studio/
+├── components/
+│   ├── VideoCanvas.tsx          # Main canvas + MediaPipe integration
+│   └── Toolbar.tsx              # UI controls (colors, brush, actions)
+├── services/
+│   └── geminiService.ts         # Calls Netlify Function (not Gemini directly)
+├── netlify/
+│   └── functions/
+│       └── analyze-drawing.ts   # Serverless function with API key
+├── App.tsx                      # Main application component
+├── index.tsx                    # Application entry point
+├── index.html                   # HTML template with Tailwind CSS CDN
+├── types.ts                     # TypeScript types & constants
+├── vite.config.ts               # Vite build configuration
+├── tsconfig.json                # TypeScript configuration
+├── netlify.toml                 # Netlify deployment + functions config
+├── package.json                 # Dependencies & scripts
+├── .env.local                   # Environment variables (NOT committed)
+├── .gitignore                   # Excludes .env.local and sensitive files
+├── .nvmrc                       # Node.js version (v20)
+├── README.md                    # User-facing documentation
+├── AGENTS.md                    # AI agents technical documentation
+├── CLAUDE.md                    # This file - setup & architecture guide
+└── GEMINI.md                    # Gemini API configuration reference
 ```
 
-### Error Simulation
+## Key Files Explained
 
-Test error handling by temporarily using an invalid API key:
+### Serverless Function: `netlify/functions/analyze-drawing.ts`
+
+This is where the **Gemini API key is used securely**:
+
+```typescript
+import { GoogleGenAI } from '@google/genai';
+
+// Server-side only - process.env works in functions
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+export const handler: Handler = async (event) => {
+  const { imageData } = JSON.parse(event.body || '{}');
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: { /* image + prompt */ }
+  });
+
+  return { statusCode: 200, body: JSON.stringify({ result: response.text }) };
+};
+```
+
+### Client Service: `services/geminiService.ts`
+
+Calls the serverless function (no API key needed):
+
+```typescript
+export const analyzeDrawing = async (base64Image: string): Promise<string> => {
+  const response = await fetch('/.netlify/functions/analyze-drawing', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageData: base64Image }),
+  });
+
+  const data = await response.json();
+  return data.result;
+};
+```
+
+### Configuration: `netlify.toml`
+
+Defines functions directory and local dev settings:
+
+```toml
+[build]
+  publish = "dist"
+  command = "yarn build"
+  functions = "netlify/functions"
+
+[dev]
+  command = "vite"
+  targetPort = 3002
+  port = 8888
+  autoLaunch = false
+```
+
+## Development Workflow
+
+### Local Development
 
 ```bash
-# .env.local (for testing only)
-API_KEY=invalid_key_for_testing
+yarn dev  # Starts Netlify Dev on http://localhost:8888
 ```
 
-## Performance Optimization
+This automatically:
 
-### Tips for Faster Responses
+- Starts Vite on an available port (typically 3002)
+- Proxies requests through Netlify Dev on port 8888
+- Loads serverless functions from `netlify/functions/`
+- Injects environment variables from `.env.local`
 
-1. **Reduce Image Size**: Downscale canvas before sending
-2. **Optimize Prompt**: Shorter prompts = faster processing
-3. **Use Flash Model**: Already optimal for speed
-4. **Implement Caching**: Cache repeated image analyses (advanced)
+### Testing the Serverless Function
 
-### Example: Image Downscaling
+Open `http://localhost:8888` and:
 
-```typescript
-function downscaleCanvas(canvas: HTMLCanvasElement, maxSize: number = 512) {
-  const scale = Math.min(1, maxSize / Math.max(canvas.width, canvas.height));
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = canvas.width * scale;
-  tempCanvas.height = canvas.height * scale;
+1. Grant camera permission
+2. Show your hand to camera
+3. Pinch to draw
+4. Click "GUESS DRAWING"
+5. The serverless function will analyze your drawing
 
-  const ctx = tempCanvas.getContext('2d');
-  ctx?.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+### Build for Production
 
-  return tempCanvas.toDataURL('image/png');
-}
+```bash
+yarn build  # Creates optimized bundle in dist/
 ```
+
+## Deployment to Netlify
+
+### 1. Connect Repository
+
+1. Push code to GitHub
+2. Go to [Netlify Dashboard](https://app.netlify.com/)
+3. Click "Add new site" → "Import an existing project"
+4. Connect to your GitHub repository
+
+### 2. Configure Build Settings
+
+Netlify will auto-detect settings from `netlify.toml`, but verify:
+
+- **Build command**: `yarn build`
+- **Publish directory**: `dist`
+- **Functions directory**: `netlify/functions`
+
+### 3. Add Environment Variable
+
+In Netlify Dashboard:
+
+1. Go to **Site settings** → **Environment variables**
+2. Click **Add a variable**
+3. Set:
+   - **Key**: `GEMINI_API_KEY`
+   - **Value**: Your Gemini API key
+   - **Scopes**: All (Production, Deploy Previews, Branch deploys)
+
+### 4. Deploy
+
+Click "Deploy site" - Netlify will:
+
+- Build your Vite app
+- Deploy serverless functions
+- Inject environment variables (server-side only)
+- Deploy to a `.netlify.app` URL
+
+**Your API key will NEVER be exposed** in the deployed JavaScript!
+
+## Environment Variables
+
+### `.env.local` (Local Development)
+
+```bash
+# Server-side only - used by Netlify Functions
+GEMINI_API_KEY=AIzaSy...your_key_here
+```
+
+**Key Points**:
+
+- No `VITE_` prefix = server-side only
+- Never committed to git (in `.gitignore`)
+- Loaded by Netlify Dev automatically
+- Used in `netlify/functions/analyze-drawing.ts`
+
+### Netlify Dashboard (Production)
+
+Add the same variable in Netlify UI:
+
+- Variable name: `GEMINI_API_KEY`
+- Value: Your API key
+- Scope: All deploy contexts
 
 ## Troubleshooting
 
-### Issue: "API key not found"
+### "Cannot find module '@netlify/functions'"
+
+**Solution**: Install dev dependencies:
+
+```bash
+yarn install
+```
+
+### "API key not found" Error
 
 **Cause**: Environment variable not loaded
 
 **Solutions**:
 
-- Verify `.env.local` exists in project root
-- Check file name (no typos)
-- Restart development server after creating `.env.local`
-- Ensure `API_KEY` matches variable name in code
+1. Verify `.env.local` exists with `GEMINI_API_KEY=your_key`
+2. Restart Netlify Dev: `yarn dev`
+3. Check for typos in variable name
 
-### Issue: Slow responses
+### Functions Not Loading
 
-**Cause**: Large image size or network latency
+**Solution**: Verify `netlify.toml` has:
 
-**Solutions**:
+```toml
+[build]
+  functions = "netlify/functions"
+```
 
-- Reduce canvas resolution
-- Downscale image before sending
-- Check network connection
-- Consider using compression
+### Port Already in Use
 
-### Issue: "Invalid image format"
+Netlify Dev will automatically try different ports. Check terminal output for the actual URL (typically `http://localhost:8888`).
 
-**Cause**: Canvas data corrupted or invalid
+## Package Scripts
 
-**Solutions**:
+```json
+{
+  "dev": "netlify dev",          // Start local dev with functions
+  "dev:vite": "vite",             // Start Vite only (no functions)
+  "build": "vite build",          // Build for production
+  "preview": "vite preview"       // Preview production build
+}
+```
 
-- Verify canvas is not empty
-- Check `toDataURL()` format is PNG
-- Ensure base64 extraction is correct
+## TypeScript Configuration
+
+### `vite-env.d.ts`
+
+No client-side environment variables are exposed:
+
+```typescript
+/// <reference types="vite/client" />
+
+// No environment variables exposed to client side
+// API key is stored server-side in Netlify Functions
+```
+
+## Dependencies
+
+### Production Dependencies
+
+```json
+{
+  "@google/genai": "^1.30.0",         // Gemini SDK (used in functions)
+  "@mediapipe/tasks-vision": "^0.10.22", // Hand tracking
+  "lucide-react": "^0.554.0",         // Icons
+  "react": "^19.2.0",                 // UI framework
+  "react-dom": "^19.2.0"              // React DOM
+}
+```
+
+### Dev Dependencies
+
+```json
+{
+  "@netlify/functions": "^5.1.0",     // Function types
+  "@types/node": "^22.14.0",          // Node.js types
+  "@vitejs/plugin-react": "^5.0.0",   // Vite React plugin
+  "netlify-cli": "^23.11.1",          // Local dev server
+  "typescript": "~5.8.2",             // TypeScript
+  "vite": "^6.2.0"                    // Build tool
+}
+```
+
+## Best Practices
+
+### Security
+
+- ✅ **Never use `VITE_` prefix** for API keys
+- ✅ **Always use serverless functions** for API calls
+- ✅ **Add `.env.local` to `.gitignore`**
+- ✅ **Validate requests** in serverless functions
+- ✅ **Implement rate limiting** per user
+
+### Performance
+
+- ✅ **Use Gemini 2.5 Flash** for speed
+- ✅ **Limit image size** before sending
+- ✅ **Enable GPU acceleration** for MediaPipe
+- ✅ **Implement error handling** with fallbacks
+
+### Development
+
+- ✅ **Use `yarn dev`** for full local simulation
+- ✅ **Test functions locally** before deploying
+- ✅ **Monitor function logs** in Netlify Dashboard
+- ✅ **Check browser console** for client errors
 
 ## Additional Resources
 
-- [Google AI Studio Documentation](https://ai.google.dev/docs)
-- [Gemini API Reference](https://ai.google.dev/api/rest)
-- [Gemini Pricing](https://ai.google.dev/pricing)
-- [Best Practices](https://ai.google.dev/docs/best_practices)
-- [Google AI Forum](https://discuss.ai.google.dev/)
+- [Netlify Functions Docs](https://docs.netlify.com/functions/overview/)
+- [Google Gemini API](https://ai.google.dev/docs)
+- [MediaPipe Hand Landmarker](https://developers.google.com/mediapipe/solutions/vision/hand_landmarker)
+- [Vite Documentation](https://vitejs.dev/)
 
-## Version Compatibility
+## Version History
 
-- **Gemini API**: v1 (Latest)
-- **@google/genai SDK**: v1.30.0 or higher
-- **Node.js**: v20 or higher
-- **TypeScript**: v5.8 or higher
-
-## Migration Notes
-
-If upgrading from previous Gemini versions:
-
-- Gemini 2.5 Flash replaces earlier Flash models
-- API interface remains compatible
-- Performance improvements included
-- No breaking changes for image analysis
-
-## Support
-
-For Gemini API issues:
-
-- [Google AI Studio Support](https://ai.google.dev/support)
-- [GitHub Issues](https://github.com/sambitcreate/aidraw/issues)
-- [Stack Overflow](https://stackoverflow.com/questions/tagged/gemini-api)
+- **v1.0.0** (2025-11-20): Initial release with secure serverless architecture
+- **Security Update** (2025-11-20): Migrated from client-side API calls to Netlify Functions
 
 ---
 
 **Last Updated**: November 20, 2025
+**Architecture**: Secure Serverless with Netlify Functions
+**Node Version**: 20
 **Gemini Model**: 2.5 Flash
-**SDK Version**: 1.30.0

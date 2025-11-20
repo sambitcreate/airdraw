@@ -2,6 +2,19 @@
 
 This document provides detailed configuration and setup instructions for integrating Google Gemini AI into the AIRDRAW application.
 
+## ⚠️ IMPORTANT: Security Architecture
+
+**This application uses Netlify Functions to keep your API key secure.**
+
+The Gemini API is **NOT** called directly from the browser. Instead:
+
+```text
+Browser → Netlify Function → Gemini API
+(no key)    (has key)         (receives request)
+```
+
+Your API key is stored server-side in `netlify/functions/analyze-drawing.ts` and is **NEVER exposed** in the client-side JavaScript bundle.
+
 ## Overview
 
 AIRDRAW uses **Google Gemini 2.5 Flash** as its AI analysis engine to interpret user drawings and provide enthusiastic, constructive feedback in the style of a Pictionary game.
@@ -48,26 +61,28 @@ Create a `.env.local` file in the project root:
 
 ```bash
 # .env.local
-API_KEY=AIzaSy...your_actual_api_key_here
+# Server-side only - NOT exposed to client
+GEMINI_API_KEY=AIzaSy...your_actual_api_key_here
 ```
 
-**Important**: Never commit `.env.local` to version control. It's already in `.gitignore`.
+**Important**:
+
+- Use `GEMINI_API_KEY` (NO `VITE_` prefix) to keep it server-side
+- Never commit `.env.local` to version control (already in `.gitignore`)
+- The API key is used by the Netlify Function, not the browser
 
 ## Installation
 
-### Install SDK
+### Install SDK and Netlify Functions
 
 Using Yarn (recommended):
 
 ```bash
 yarn add @google/genai
+yarn add -D @netlify/functions netlify-cli
 ```
 
-Using npm:
-
-```bash
-npm install @google/genai
-```
+**Note**: The SDK is used in the serverless function, not in the browser code.
 
 ### Verify Installation
 
@@ -83,73 +98,77 @@ Check that the package is listed in `package.json`:
 
 ## Configuration
 
+### Serverless Function Setup
+
+The Gemini SDK is initialized **server-side** in [netlify/functions/analyze-drawing.ts](netlify/functions/analyze-drawing.ts):
+
+```typescript
+import { GoogleGenAI } from '@google/genai';
+
+// Server-side environment variable (secure)
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+export const handler: Handler = async (event) => {
+  const { imageData } = JSON.parse(event.body || '{}');
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: { /* image + prompt */ }
+  });
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ result: response.text })
+  };
+};
+```
+
 ### Environment Variable Loading
 
-Vite automatically loads environment variables from `.env.local`:
+**Local Development**: `.env.local` file is loaded by Netlify Dev
 
-```typescript
-// Accessed in code as:
-const apiKey = import.meta.env.VITE_API_KEY;
-```
-
-**Note**: Current implementation uses `API_KEY` directly (requires Vite config adjustment for production).
-
-### SDK Initialization
-
-The Gemini client is initialized in [services/geminiService.ts](services/geminiService.ts):
-
-```typescript
-import { GoogleGenerativeAI } from '@google/genai';
-
-const apiKey = import.meta.env.API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-```
+**Production**: Environment variables set in Netlify Dashboard → Site Settings → Environment Variables
 
 ## Usage in AIRDRAW
 
-### Main Function: analyzeDrawing
+### Client-Side Function: analyzeDrawing
 
-Located in [services/geminiService.ts](services/geminiService.ts):
+Located in [services/geminiService.ts](services/geminiService.ts), this function calls the **serverless function**, not Gemini directly:
 
 ```typescript
-export async function analyzeDrawing(dataUrl: string): Promise<string> {
+export const analyzeDrawing = async (base64Image: string): Promise<string> => {
   try {
-    // Extract base64 image data
-    const base64Data = dataUrl.split(',')[1];
+    // Call Netlify Function (no API key needed here)
+    const response = await fetch('/.netlify/functions/analyze-drawing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageData: base64Image }),
+    });
 
-    // Create prompt
-    const prompt = "You are an art critic playing Pictionary. " +
-                   "Briefly guess what this drawing represents. " +
-                   "Be enthusiastic and constructive. Keep it under 30 words.";
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-    // Send to Gemini
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: "image/png",
-          data: base64Data
-        }
-      }
-    ]);
-
-    return result.response.text();
+    const data = await response.json();
+    return data.result || "I couldn't quite see what that was. Try drawing it again!";
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Oops! I had trouble analyzing your drawing. Please try again!";
+    console.error("Error analyzing drawing:", error);
+    return "Sorry, I had trouble seeing your masterpiece. Please check your connection.";
   }
-}
+};
 ```
 
-### Request Flow
+### Request Flow (Secure Architecture)
 
 1. **User Action**: Clicks "GUESS DRAWING" button in UI
 2. **Canvas Capture**: Canvas converted to base64 PNG via `canvas.toDataURL("image/png")`
-3. **API Call**: `analyzeDrawing()` sends image + prompt to Gemini
-4. **Processing**: Gemini analyzes image and generates response
-5. **Response**: Text interpretation returned to UI
-6. **Display**: Result shown in toast notification
+3. **Client Call**: `analyzeDrawing()` sends image to **Netlify Function** (NOT Gemini)
+4. **Server Processing**: Netlify Function receives image, adds API key, calls Gemini
+5. **Gemini Processing**: Gemini analyzes image and generates response
+6. **Server Response**: Netlify Function returns result to client
+7. **Display**: Result shown in toast notification
+
+**Security Benefit**: API key never leaves the server, never exposed in browser
 
 ## Prompt Engineering
 
@@ -322,10 +341,13 @@ try {
 
 ### Manual Testing
 
-1. Start dev server: `yarn dev`
-2. Draw something on canvas
-3. Click "GUESS DRAWING"
-4. Verify response appears in toast
+1. Start Netlify Dev server: `yarn dev` (NOT `vite`)
+2. Open `http://localhost:8888` (Netlify Dev URL)
+3. Draw something on canvas
+4. Click "GUESS DRAWING"
+5. Verify response appears in toast
+
+**Note**: Use `yarn dev` (Netlify Dev) to test the serverless function locally. Plain `vite` won't load the functions.
 
 ### Testing Different Prompts
 

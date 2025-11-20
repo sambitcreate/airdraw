@@ -25,7 +25,8 @@ AIRDRAW is an innovative web application that combines computer vision with AI t
 
 - **Frontend**: React 19.2 with TypeScript
 - **Computer Vision**: Google MediaPipe Hand Landmarker v0.10.22
-- **AI Analysis**: Google Gemini 2.5 Flash
+- **AI Analysis**: Google Gemini 2.5 Flash (via Netlify Functions)
+- **Serverless**: Netlify Functions for secure API key management
 - **Build Tool**: Vite 6.2
 - **Styling**: Tailwind CSS (CDN)
 - **Package Manager**: Yarn 1.22
@@ -52,10 +53,15 @@ AIRDRAW is an innovative web application that combines computer vision with AI t
    ```
 
 3. **Set up environment variables**:
+
    Create a `.env.local` file in the root directory and add your Gemini API key:
+
+   ```bash
+   # Server-side only - NOT exposed to client
+   GEMINI_API_KEY=your_gemini_api_key_here
    ```
-   API_KEY=your_gemini_api_key_here
-   ```
+
+   **Note**: Use `GEMINI_API_KEY` (no `VITE_` prefix) to keep it server-side.
 
 4. **Run the development server**:
    ```bash
@@ -75,7 +81,7 @@ AIRDRAW is an innovative web application that combines computer vision with AI t
 
 ## Project Structure
 
-```
+```text
 airdraw-studio/
 ├── components/
 │   ├── VideoCanvas.tsx    # Main canvas with hand tracking & MediaPipe integration
@@ -157,13 +163,27 @@ AI integration that:
 
 ## Deployment
 
-The app is configured for easy deployment to Netlify:
+The app is configured for easy deployment to Netlify with secure serverless functions:
 
-1. Connect your repository to Netlify
-2. Set the `API_KEY` environment variable in Netlify's dashboard
-3. Build command is automatically set to `yarn build`
-4. Publish directory is `dist`
-5. Node.js version is set to 20 in `netlify.toml`
+1. **Connect your repository** to Netlify
+2. **Set environment variable** in Netlify Dashboard → Site Settings → Environment Variables:
+   - Key: `GEMINI_API_KEY`
+   - Value: Your Gemini API key
+   - Scopes: All (Production, Deploy Previews, Branch deploys)
+3. **Build settings** (auto-detected from `netlify.toml`):
+   - Build command: `yarn build`
+   - Publish directory: `dist`
+   - Functions directory: `netlify/functions`
+   - Node.js version: 20
+4. **Deploy** - Your API key will be server-side only, never exposed in the deployed JavaScript!
+
+### Local Development with Functions
+
+```bash
+yarn dev  # Starts Netlify Dev on http://localhost:8888
+```
+
+This runs both the Vite dev server AND the serverless functions locally.
 
 ### Build Commands
 
@@ -184,10 +204,21 @@ yarn dev       # Run development server
 
 ## Privacy & Security
 
-- Webcam feed is processed locally in your browser via MediaPipe
-- Only canvas images (drawings) are sent to Gemini for analysis
-- No video or personal data is stored or transmitted
-- API key should be stored securely in `.env.local` (not committed to git)
+- **Webcam feed**: Processed 100% locally in browser via MediaPipe WASM
+- **Video data**: Never leaves your device
+- **Canvas images**: Only sent to Gemini when you click "GUESS DRAWING"
+- **API key**: Stored server-side in Netlify Functions, **NEVER exposed** in browser
+- **No tracking**: No analytics, cookies, or user data collection
+- **Open source**: All code is auditable on GitHub
+
+### Secure Architecture
+
+```text
+Browser → Netlify Function → Gemini API
+(no API key)   (has API key)    (receives request)
+```
+
+Your Gemini API key is stored in `netlify/functions/analyze-drawing.ts` and is never included in the client-side JavaScript bundle.
 
 ## Troubleshooting
 

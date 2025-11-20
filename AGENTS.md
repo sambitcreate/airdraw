@@ -2,12 +2,23 @@
 
 This document provides a comprehensive overview of all AI agents and services integrated into the AIRDRAW application, including their architecture, implementation details, and integration patterns.
 
+## 🔒 Security Architecture
+
+**IMPORTANT**: This application uses a **secure serverless architecture** to protect the Gemini API key:
+
+```text
+Browser → Netlify Function → Gemini API
+(no key)    (has key)         (receives request)
+```
+
+The Gemini API key is **NEVER exposed** in the client-side code. All API calls are proxied through a Netlify Function at `netlify/functions/analyze-drawing.ts`.
+
 ## Overview
 
 AIRDRAW leverages two primary AI/ML services to create an intelligent gesture-drawing experience:
 
-1. **Google Gemini 2.5 Flash** - Generative AI for drawing analysis
-2. **Google MediaPipe Hand Landmarker** - Computer vision for hand tracking
+1. **Google Gemini 2.5 Flash** - Generative AI for drawing analysis (via Netlify Functions)
+2. **Google MediaPipe Hand Landmarker** - Computer vision for hand tracking (client-side)
 
 ## 1. Google Gemini AI Agent
 
@@ -27,25 +38,27 @@ The Gemini AI agent serves as an enthusiastic "Art Critic" for the AIRDRAW appli
 
 #### Location
 
-- **File**: [services/geminiService.ts](services/geminiService.ts)
+- **Client Function**: [services/geminiService.ts](services/geminiService.ts) - Calls serverless function
+- **Serverless Function**: [netlify/functions/analyze-drawing.ts](netlify/functions/analyze-drawing.ts) - Calls Gemini API
 - **Main Function**: `analyzeDrawing(dataUrl: string): Promise<string>`
-- **Lines**: 10-40
 
 #### Authentication
 
-- **Method**: API Key authentication
-- **Storage**: Environment variable `API_KEY`
-- **Configuration**: Loaded from `.env.local` file
-- **Security**: API key should never be committed to version control
+- **Method**: API Key authentication (server-side only)
+- **Storage**: Environment variable `GEMINI_API_KEY` (no `VITE_` prefix)
+- **Configuration**: Loaded from `.env.local` (local) or Netlify Dashboard (production)
+- **Security**: API key is server-side only, never exposed in browser JavaScript
 
-#### How It Works
+#### How It Works (Secure Flow)
 
 1. **Canvas Capture**: When the user clicks "GUESS DRAWING" button, the drawing canvas is captured
 2. **Image Conversion**: Canvas content is converted to base64-encoded PNG format using `canvas.toDataURL("image/png")`
-3. **Data Processing**: Base64 string is extracted (removing the data URL prefix)
-4. **API Request**: Image is sent to Gemini 2.5 Flash with a specialized prompt
-5. **Response Processing**: AI returns a concise, enthusiastic interpretation
-6. **UI Display**: Result is shown in a toast notification at the top of the screen
+3. **Client Request**: Client calls Netlify Function at `/.netlify/functions/analyze-drawing`
+4. **Server Processing**: Netlify Function receives image, extracts base64 data
+5. **API Request**: Function calls Gemini 2.5 Flash with API key and specialized prompt
+6. **Response Processing**: AI returns a concise, enthusiastic interpretation
+7. **Server Response**: Function returns result to client
+8. **UI Display**: Result is shown in a toast notification at the top of the screen
 
 #### Prompt Engineering
 
@@ -272,8 +285,11 @@ User Triggers Analysis → Gemini API → AI Response → Toast Display
 
 ```bash
 # .env.local
-API_KEY=your_gemini_api_key_here
+# Server-side only - NOT exposed to client
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
+
+**Note**: Use `GEMINI_API_KEY` (no `VITE_` prefix) to keep it server-side only.
 
 ### Dependencies
 
