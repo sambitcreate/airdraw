@@ -78,6 +78,18 @@ const App: React.FC = () => {
         </div>
       </div>
 
+      {/* Footer attribution */}
+      <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-40">
+        <a
+          href="https://bitcreate.studio"
+          target="_blank"
+          rel="noreferrer"
+          className="pointer-events-auto text-xs uppercase tracking-[0.2em] text-zinc-400 hover:text-white transition-colors"
+        >
+          Bitcreate Studio
+        </a>
+      </div>
+
     </div>
   );
 };
