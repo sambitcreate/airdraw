@@ -5,7 +5,7 @@ import { Loader2, Camera, Hand, MousePointer2 } from 'lucide-react';
 import { analyzeDrawing } from '../services/geminiService';
 
 // --- Constants ---
-const PINCH_THRESHOLD = 0.08; 
+const PINCH_THRESHOLD = 0.12; // Increased from 0.08 for more reliable pinch detection
 const SMOOTHING_FACTOR = 0.2;
 const CURSOR_RADIUS = 6;
 
@@ -59,7 +59,9 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
           numHands: 1,
         });
         setIsLoading(false);
-        startCamera();
+
+        // Await camera startup to ensure proper initialization order
+        await startCamera();
       } catch (error) {
         console.error("Error initializing MediaPipe:", error);
         setIsLoading(false);
@@ -83,8 +85,34 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
         },
       });
       videoRef.current.srcObject = stream;
-      videoRef.current.addEventListener("loadeddata", predictWebcam);
+
+      // Wait for video to be ready with frame data before starting detection
+      await new Promise<void>((resolve) => {
+        const video = videoRef.current!;
+        const checkReady = () => {
+          if (video.readyState >= 2) { // HAVE_CURRENT_DATA or better
+            video.removeEventListener('loadedmetadata', checkReady);
+            video.removeEventListener('loadeddata', checkReady);
+            resolve();
+          }
+        };
+
+        video.addEventListener('loadedmetadata', checkReady);
+        video.addEventListener('loadeddata', checkReady);
+
+        // Check immediately in case already ready
+        if (video.readyState >= 2) {
+          video.removeEventListener('loadedmetadata', checkReady);
+          video.removeEventListener('loadeddata', checkReady);
+          resolve();
+        }
+      });
+
       setHasCameraPermission(true);
+      console.log("Camera ready, starting hand detection loop");
+
+      // NOW start the animation loop after video is confirmed ready
+      predictWebcam();
     } catch (err) {
       console.error("Error accessing webcam:", err);
       setHasCameraPermission(false);
@@ -144,13 +172,27 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
 
   const predictWebcam = () => {
     if (!videoRef.current || !canvasRef.current || !cursorCanvasRef.current || !handLandmarkerRef.current) return;
-    
+
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const cursorCtx = cursorCanvasRef.current.getContext('2d');
     const ctx = canvas.getContext('2d');
 
     if (!cursorCtx || !ctx) return;
+
+    // Check if video has frame data available
+    if (video.readyState < 2) { // HAVE_CURRENT_DATA
+      console.warn("Video not ready, readyState:", video.readyState);
+      animationFrameId.current = requestAnimationFrame(predictWebcam);
+      return;
+    }
+
+    // Check if video dimensions are available
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.warn("Video dimensions not ready");
+      animationFrameId.current = requestAnimationFrame(predictWebcam);
+      return;
+    }
 
     // Resize handling
     if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
@@ -274,8 +316,7 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
       {/* Drawing Canvas - Layer 1 */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full object-cover transform -scale-x-100 z-10" 
-        style={{ transform: 'none' }} 
+        className="absolute inset-0 w-full h-full object-cover transform -scale-x-100 z-10"
       />
       
       {/* UI Children (Toolbar) - Layer 2 */}
