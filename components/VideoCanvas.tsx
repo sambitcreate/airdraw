@@ -35,6 +35,7 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
   const cursorCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const [isDetectionInitialized, setIsDetectionInitialized] = useState(false);
   const [isPinching, setIsPinching] = useState(false);
   
   const lastPoint = useRef<Point | null>(null);
@@ -42,6 +43,12 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
   const animationFrameId = useRef<number | null>(null);
   const isDrawingRef = useRef<boolean>(false);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log("State changed:", { isLoading, hasCameraPermission, isDetectionInitialized });
+    console.log("Should show init button:", !isLoading && hasCameraPermission && !isDetectionInitialized);
+  }, [isLoading, hasCameraPermission, isDetectionInitialized]);
 
   // --- Setup MediaPipe ---
   useEffect(() => {
@@ -109,14 +116,19 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
       });
 
       setHasCameraPermission(true);
-      console.log("Camera ready, starting hand detection loop");
-
-      // NOW start the animation loop after video is confirmed ready
-      predictWebcam();
+      console.log("Camera ready, waiting for user to initialize hand detection");
+      console.log("State - isLoading:", false, "hasCameraPermission:", true, "isDetectionInitialized:", false);
     } catch (err) {
       console.error("Error accessing webcam:", err);
       setHasCameraPermission(false);
     }
+  };
+
+  const initializeHandDetection = () => {
+    console.log("Initializing hand detection...");
+    setIsDetectionInitialized(true);
+    // Start the hand detection animation loop
+    predictWebcam();
   };
 
   const getDistance = (p1: { x: number; y: number }, p2: { x: number; y: number }) => {
@@ -301,6 +313,37 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 text-red-500">
           <Camera className="w-10 h-10 mb-4" />
           <p className="text-base font-medium">Camera Access Denied</p>
+        </div>
+      )}
+
+      {/* Initialize Hand Detection Button */}
+      {!isLoading && hasCameraPermission && !isDetectionInitialized && (
+        <div
+          className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <div className="flex flex-col items-center gap-8 p-12 rounded-3xl bg-white/10 border-2 border-white/20 shadow-2xl max-w-md mx-4">
+            <Hand className="w-20 h-20 text-white animate-pulse drop-shadow-lg" />
+            <div className="text-center space-y-3">
+              <h2 className="text-3xl font-bold text-white tracking-wide drop-shadow-md">Camera Ready!</h2>
+              <p className="text-base text-white/80 leading-relaxed">
+                Click the button below to start hand tracking and begin drawing with your gestures
+              </p>
+            </div>
+            <button
+              onClick={initializeHandDetection}
+              className="px-12 py-5 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold rounded-full
+                       hover:from-blue-600 hover:to-purple-700 active:scale-95 transition-all duration-200
+                       shadow-2xl hover:shadow-purple-500/50 uppercase tracking-widest text-base
+                       border-2 border-white/30 cursor-pointer"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
+              🚀 Start Hand Detection
+            </button>
+            <p className="text-xs text-white/50 mt-2">
+              Make sure your hand is visible in the camera
+            </p>
+          </div>
         </div>
       )}
 
