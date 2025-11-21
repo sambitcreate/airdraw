@@ -20,7 +20,7 @@ describe('analyze-drawing Netlify function', () => {
   });
 
   it('returns 405 for non-POST requests', async () => {
-    const { handler } = await import('./analyze-drawing');
+    const { handler } = await import('../../netlify/functions/analyze-drawing');
 
     const result = await handler({ httpMethod: 'GET' } as any);
 
@@ -28,7 +28,7 @@ describe('analyze-drawing Netlify function', () => {
   });
 
   it('returns 400 when image data is missing', async () => {
-    const { handler } = await import('./analyze-drawing');
+    const { handler } = await import('../../netlify/functions/analyze-drawing');
 
     const result = await handler({ httpMethod: 'POST', body: '{}' } as any);
 
@@ -37,7 +37,7 @@ describe('analyze-drawing Netlify function', () => {
   });
 
   it('calls Gemini with text instructions followed by inline image data', async () => {
-    const { handler } = await import('./analyze-drawing');
+    const { handler } = await import('../../netlify/functions/analyze-drawing');
 
     generateContentMock.mockResolvedValue({
       response: {
@@ -72,7 +72,7 @@ describe('analyze-drawing Netlify function', () => {
   });
 
   it('returns 500 when Gemini does not return an image', async () => {
-    const { handler } = await import('./analyze-drawing');
+    const { handler } = await import('../../netlify/functions/analyze-drawing');
 
     generateContentMock.mockResolvedValue({ response: { candidates: [] } });
 
