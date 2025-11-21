@@ -1,10 +1,10 @@
 /**
- * Analyzes the drawing canvas to guess what is drawn.
+ * Enhances the drawing canvas by generating a refined image.
  * Calls the serverless function to keep API key secure.
  * @param base64Image The base64 encoded image string from the canvas.
- * @returns A string description of the drawing.
+ * @returns A base64 data URL for the enhanced image.
  */
-export const analyzeDrawing = async (base64Image: string): Promise<string> => {
+export const enhanceDrawing = async (base64Image: string): Promise<string> => {
   try {
     const response = await fetch('/.netlify/functions/analyze-drawing', {
       method: 'POST',
@@ -21,9 +21,9 @@ export const analyzeDrawing = async (base64Image: string): Promise<string> => {
     }
 
     const data = await response.json();
-    return data.result || "I couldn't quite see what that was. Try drawing it again!";
+    return data.image || "";
   } catch (error) {
     console.error("Error analyzing drawing:", error);
-    return "Sorry, I had trouble seeing your masterpiece. Please check your connection.";
+    return "";
   }
 };

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { COLORS, BRUSH_SIZES } from '../types';
 import { Trash2, BrainCircuit, Palette, Paintbrush } from 'lucide-react';
+import { gsap } from 'gsap';
 
 const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds cooldown
 
@@ -24,6 +25,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
   isAnalysing
 }) => {
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const analyzeButtonRef = useRef<HTMLButtonElement>(null);
+  const loaderRingRef = useRef<HTMLDivElement>(null);
+  const loaderTimelineRef = useRef<gsap.core.Timeline | null>(null);
 
   const isOnCooldown = cooldownRemaining > 0;
   const isButtonDisabled = isAnalysing || isOnCooldown;
@@ -48,6 +52,35 @@ const Toolbar: React.FC<ToolbarProps> = ({
   }, [cooldownRemaining]);
 
   const cooldownSeconds = Math.ceil(cooldownRemaining / 1000);
+
+  useEffect(() => {
+    const ring = loaderRingRef.current;
+    const timeline = loaderTimelineRef.current;
+
+    if (!ring) return;
+
+    if (timeline) {
+      timeline.kill();
+      loaderTimelineRef.current = null;
+    }
+
+    if (isAnalysing) {
+      gsap.set(ring, { opacity: 1, scale: 1 });
+
+      const tl = gsap.timeline({ repeat: -1 });
+      tl.to(ring, { rotation: 360, duration: 1.6, ease: 'none', transformOrigin: '50% 50%' });
+      tl.to(ring, { boxShadow: '0 0 18px rgba(168,85,247,0.45)', duration: 0.6, ease: 'sine.inOut' }, 0);
+      tl.to(ring, { boxShadow: '0 0 18px rgba(34,211,238,0.55)', duration: 0.6, ease: 'sine.inOut', delay: 0.4 }, 0);
+      loaderTimelineRef.current = tl;
+    } else {
+      gsap.to(ring, { opacity: 0, duration: 0.3, ease: 'power2.out' });
+    }
+
+    return () => {
+      loaderTimelineRef.current?.kill();
+      loaderTimelineRef.current = null;
+    };
+  }, [isAnalysing]);
 
   return (
     <div className="absolute right-0 top-0 h-full w-72 bg-black/90 backdrop-blur-sm border-l border-zinc-800 p-6 flex flex-col gap-8 z-20">
@@ -125,19 +158,26 @@ const Toolbar: React.FC<ToolbarProps> = ({
           data-action="analyze"
           onClick={handleAnalyzeClick}
           disabled={isButtonDisabled}
-          className={`group w-full h-11 rounded-md flex items-center justify-center gap-2 text-sm font-medium transition-all
+          ref={analyzeButtonRef}
+          className={`group relative w-full h-11 rounded-md flex items-center justify-center gap-2 text-sm font-medium transition-all
             ${isButtonDisabled
               ? 'bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800'
               : 'bg-white text-black hover:bg-zinc-200 border border-white'
             }`}
         >
+          <div
+            ref={loaderRingRef}
+            className="pointer-events-none absolute inset-[-4px] rounded-lg bg-[conic-gradient(at_50%_50%,#22d3ee,#a855f7,#f59e0b,#22d3ee)] opacity-0"
+            style={{ WebkitMaskImage: 'radial-gradient(circle, transparent 62%, black 65%)', maskImage: 'radial-gradient(circle, transparent 62%, black 65%)' }}
+            aria-hidden
+          />
           {isAnalysing ? (
             <BrainCircuit className="w-4 h-4 animate-pulse" />
           ) : (
             <BrainCircuit className="w-4 h-4 transition-transform group-hover:scale-110" />
           )}
           <span className="tracking-wide font-semibold">
-            {isAnalysing ? 'ANALYZING...' : isOnCooldown ? `WAIT ${cooldownSeconds}s` : 'GUESS DRAWING'}
+            {isAnalysing ? 'ENHANCING...' : isOnCooldown ? `WAIT ${cooldownSeconds}s` : 'ENHANCE DRAWING'}
           </span>
         </button>
 

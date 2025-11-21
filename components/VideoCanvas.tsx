@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { Point } from '../types';
 import { Loader2, Camera, Hand, MousePointer2 } from 'lucide-react';
-import { analyzeDrawing } from '../services/geminiService';
+import { enhanceDrawing } from '../services/geminiService';
 
 // --- Constants ---
 const PINCH_THRESHOLD = 0.12; // Increased from 0.08 for more reliable pinch detection
@@ -16,7 +16,7 @@ interface VideoCanvasProps {
   onSizeSelect: (size: number) => void;
   onClear: () => void;
   isAnalysing: boolean;
-  setAnalysisResult: (text: string) => void;
+  setEnhancedImage: (dataUrl: string | null) => void;
   setIsAnalysing: (val: boolean) => void;
   children?: React.ReactNode;
 }
@@ -28,7 +28,7 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
   onSizeSelect,
   onClear,
   isAnalysing,
-  setAnalysisResult,
+  setEnhancedImage,
   setIsAnalysing,
   children
 }) => {
@@ -184,15 +184,25 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
     }
   }, [onClear]);
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = useCallback(async () => {
       if (canvasRef.current) {
         setIsAnalysing(true);
+        setEnhancedImage(null);
         const dataUrl = canvasRef.current.toDataURL("image/png");
-        const result = await analyzeDrawing(dataUrl);
-        setAnalysisResult(result);
+        const result = await enhanceDrawing(dataUrl);
+        setEnhancedImage(result || null);
         setIsAnalysing(false);
       }
-  };
+  }, [setEnhancedImage, setIsAnalysing]);
+
+  useEffect(() => {
+    const listener = () => handleAnalyze();
+    window.addEventListener('triggerAnalyze', listener);
+
+    return () => {
+      window.removeEventListener('triggerAnalyze', listener);
+    };
+  }, [handleAnalyze]);
 
 
   const predictWebcam = () => {
