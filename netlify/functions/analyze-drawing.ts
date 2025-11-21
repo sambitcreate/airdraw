@@ -9,6 +9,8 @@ const enhancementInstructions = [
   'Convert basic shapes and lines into detailed, colorful characters or objects with proper proportions, textures, and lighting.',
   'Add realistic details, shading, and depth while maintaining the original composition and recognizable shape of the drawing.',
   'Create a polished, professional-looking image that brings the simple drawing to life without adding new elements or changing the core concept.',
+  'Add a beautiful, artistic background that complements the main subject - use gradients, subtle patterns, or scenic elements that enhance the overall composition.',
+  'Ensure the background is visually appealing and not just plain black or white - use colors and styles that match the mood of the drawing.',
   'Return a high-quality PNG image that maintains the original aspect ratio.',
 ].join(' ');
 

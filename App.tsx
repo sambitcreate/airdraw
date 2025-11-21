@@ -53,25 +53,44 @@ const App: React.FC = () => {
         
       {/* Result Display */}
       {enhancedImage && (
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-3 animate-in slide-in-from-top-4 fade-in duration-300">
-          <button
+        <>
+          {/* Blurred background overlay */}
+          <div
+            className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
             onClick={() => setEnhancedImage(null)}
-            className="text-zinc-500 hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          />
           
-          <img src={enhancedImage} alt="Enhanced drawing" className="max-w-md rounded-lg shadow-2xl" />
-          
-          <a
-            href={enhancedImage}
-            download="airdraw-enhanced.png"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-black bg-white rounded-md px-3 py-2 hover:bg-zinc-200 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Save
-          </a>
-        </div>
+          {/* Image container */}
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-8 animate-in zoom-in-95 duration-300">
+            <div className="relative flex flex-col items-center gap-4 w-[70vw] h-[70vh]">
+              {/* Close button */}
+              <button
+                onClick={() => setEnhancedImage(null)}
+                className="absolute -top-12 right-0 text-zinc-400 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              
+              {/* Image */}
+              <img
+                src={enhancedImage}
+                alt="Enhanced drawing"
+                className="w-full h-full object-contain rounded-lg shadow-2xl"
+              />
+              
+              {/* Save button */}
+              <a
+                href={enhancedImage}
+                download="airdraw-enhanced.png"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-black bg-white rounded-md px-4 py-2 hover:bg-zinc-200 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download className="w-4 h-4" />
+                Save Image
+              </a>
+            </div>
+          </div>
+        </>
       )}
       
       {/* Mobile Warning */}
