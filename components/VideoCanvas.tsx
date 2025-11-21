@@ -367,7 +367,7 @@ const VideoCanvas: React.FC<VideoCanvasProps> = ({
       {/* Drawing Canvas - Layer 1 */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full object-cover transform -scale-x-100 z-10"
+        className="absolute inset-0 w-full h-full object-cover z-10"
       />
       
       {/* UI Children (Toolbar) - Layer 2 */}
