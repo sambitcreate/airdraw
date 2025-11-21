@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { COLORS, BRUSH_SIZES } from '../types';
 import { Trash2, BrainCircuit, Palette, Paintbrush } from 'lucide-react';
+import gsap from 'gsap';
 
 const ANALYZE_COOLDOWN_MS = 10000; // 10 seconds cooldown
 
@@ -24,6 +25,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   isAnalysing
 }) => {
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const indicatorRef = useRef<HTMLDivElement>(null);
 
   const isOnCooldown = cooldownRemaining > 0;
   const isButtonDisabled = isAnalysing || isOnCooldown;
@@ -48,6 +50,36 @@ const Toolbar: React.FC<ToolbarProps> = ({
   }, [cooldownRemaining]);
 
   const cooldownSeconds = Math.ceil(cooldownRemaining / 1000);
+
+  useEffect(() => {
+    if (!indicatorRef.current) return;
+
+    if (!isAnalysing) {
+      gsap.killTweensOf(indicatorRef.current);
+      gsap.set(indicatorRef.current, { clearProps: 'all' });
+      return;
+    }
+
+    const rotationTween = gsap.to(indicatorRef.current, {
+      rotate: 360,
+      repeat: -1,
+      ease: 'none',
+      duration: 1.4,
+    });
+
+    const pulseTween = gsap.to(indicatorRef.current, {
+      boxShadow: '0 0 18px rgba(167, 139, 250, 0.8), 0 0 32px rgba(52, 211, 153, 0.35)',
+      repeat: -1,
+      yoyo: true,
+      duration: 0.8,
+      ease: 'sine.inOut',
+    });
+
+    return () => {
+      rotationTween.kill();
+      pulseTween.kill();
+    };
+  }, [isAnalysing]);
 
   return (
     <div className="absolute right-0 top-0 h-full w-72 bg-black/90 backdrop-blur-sm border-l border-zinc-800 p-6 flex flex-col gap-8 z-20">
@@ -121,25 +153,36 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* Actions */}
       <div className="space-y-3 pb-4">
-        <button
-          data-action="analyze"
-          onClick={handleAnalyzeClick}
-          disabled={isButtonDisabled}
-          className={`group w-full h-11 rounded-md flex items-center justify-center gap-2 text-sm font-medium transition-all
-            ${isButtonDisabled
-              ? 'bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800'
-              : 'bg-white text-black hover:bg-zinc-200 border border-white'
-            }`}
-        >
-          {isAnalysing ? (
-            <BrainCircuit className="w-4 h-4 animate-pulse" />
-          ) : (
-            <BrainCircuit className="w-4 h-4 transition-transform group-hover:scale-110" />
+        <div className="relative">
+          {isAnalysing && (
+            <div
+              ref={indicatorRef}
+              className="pointer-events-none absolute -inset-[6px] rounded-md overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-400 via-cyan-300 to-amber-300 opacity-70" />
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-teal-300 to-yellow-300 opacity-60 blur-lg" />
+            </div>
           )}
-          <span className="tracking-wide font-semibold">
-            {isAnalysing ? 'ANALYZING...' : isOnCooldown ? `WAIT ${cooldownSeconds}s` : 'GUESS DRAWING'}
-          </span>
-        </button>
+          <button
+            data-action="analyze"
+            onClick={handleAnalyzeClick}
+            disabled={isButtonDisabled}
+            className={`group relative w-full h-11 rounded-md flex items-center justify-center gap-2 text-sm font-medium transition-all
+              ${isButtonDisabled
+                ? 'bg-zinc-900 text-zinc-500 cursor-not-allowed border border-zinc-800'
+                : 'bg-white text-black hover:bg-zinc-200 border border-white'
+              }`}
+          >
+            {isAnalysing ? (
+              <BrainCircuit className="w-4 h-4 animate-pulse" />
+            ) : (
+              <BrainCircuit className="w-4 h-4 transition-transform group-hover:scale-110" />
+            )}
+            <span className="tracking-wide font-semibold">
+              {isAnalysing ? 'ENHANCING...' : isOnCooldown ? `WAIT ${cooldownSeconds}s` : 'ENHANCE DRAWING'}
+            </span>
+          </button>
+        </div>
 
         <button
           data-action="clear"

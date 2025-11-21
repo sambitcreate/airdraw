@@ -2,19 +2,16 @@ import React, { useState } from 'react';
 import VideoCanvas from './components/VideoCanvas';
 import Toolbar from './components/Toolbar';
 import { COLORS } from './types';
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles, X, Download } from 'lucide-react';
 
 const App: React.FC = () => {
   const [color, setColor] = useState<string>(COLORS[1].value); // Default Cyan
   const [brushSize, setBrushSize] = useState<number>(8);
-  const [aiResult, setAiResult] = useState<string | null>(null);
+  const [enhancedImage, setEnhancedImage] = useState<string | null>(null);
   const [isAnalysing, setIsAnalysing] = useState(false);
-  
-  const [clearTrigger, setClearTrigger] = useState(0);
 
   const handleClear = () => {
-    setClearTrigger(prev => prev + 1);
-    setAiResult(null);
+    setEnhancedImage(null);
   };
 
   return (
@@ -26,9 +23,9 @@ const App: React.FC = () => {
         brushSize={brushSize}
         onColorSelect={setColor}
         onSizeSelect={setBrushSize}
-        onClear={() => setAiResult(null)}
+        onClear={() => setEnhancedImage(null)}
         isAnalysing={isAnalysing}
-        setAnalysisResult={setAiResult}
+        setEnhancedImage={setEnhancedImage}
         setIsAnalysing={setIsAnalysing}
       >
         {/* Toolbar Overlay - Passed as child to sit between video and cursor */}
@@ -47,26 +44,35 @@ const App: React.FC = () => {
       </VideoCanvas>
         
       {/* Result Toast Overlay */}
-      {aiResult && (
+      {enhancedImage && (
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-in slide-in-from-top-4 fade-in duration-300">
           <div className="bg-black/90 backdrop-blur-md border border-zinc-800 p-6 rounded-xl shadow-2xl relative flex flex-col gap-3">
-              <button 
-                onClick={() => setAiResult(null)} 
+              <button
+                onClick={() => setEnhancedImage(null)}
                 className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
-              
+
               <div className="flex items-center gap-2 text-white">
                 <div className="p-1.5 bg-white/10 rounded-full">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h3 className="font-semibold text-xs uppercase tracking-widest">AI Analysis</h3>
+                <h3 className="font-semibold text-xs uppercase tracking-widest">AI Enhancement</h3>
               </div>
-              
-              <p className="text-zinc-300 text-sm leading-relaxed font-light">
-                {aiResult}
-              </p>
+
+              <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-950/60">
+                <img src={enhancedImage} alt="Enhanced drawing" className="w-full h-auto" />
+              </div>
+
+              <a
+                href={enhancedImage}
+                download="airdraw-enhanced.png"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-black bg-white rounded-md px-3 py-2 hover:bg-zinc-200 transition-colors w-fit"
+              >
+                <Download className="w-4 h-4" />
+                Save Image
+              </a>
           </div>
         </div>
       )}
