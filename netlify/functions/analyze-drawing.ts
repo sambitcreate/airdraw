@@ -5,10 +5,11 @@ import { GoogleGenAI, Modality } from '@google/genai';
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const enhancementInstructions = [
-  'Using the provided drawing, keep the composition and proportions identical while upgrading it into a clean, polished image.',
-  'Fix faint or broken strokes, preserve silhouettes, and avoid adding new subjects or any text overlays.',
-  'If the subject is realistic, render it with believable lighting, depth, and materials; otherwise lean into an expressive artistic finish.',
-  'Return a crisp PNG the user can save without changing the aspect ratio.',
+  'Transform this simple stick figure or child-like drawing into a vibrant, realistic, and fun-looking image while preserving the basic silhouette and pose.',
+  'Convert basic shapes and lines into detailed, colorful characters or objects with proper proportions, textures, and lighting.',
+  'Add realistic details, shading, and depth while maintaining the original composition and recognizable shape of the drawing.',
+  'Create a polished, professional-looking image that brings the simple drawing to life without adding new elements or changing the core concept.',
+  'Return a high-quality PNG image that maintains the original aspect ratio.',
 ].join(' ');
 
 export const handler: Handler = async (event) => {
@@ -55,7 +56,7 @@ export const handler: Handler = async (event) => {
       },
     });
 
-    const candidates = response.response?.candidates ?? response.candidates ?? [];
+    const candidates = response.candidates ?? [];
     const imagePart = candidates[0]?.content?.parts?.find(
       (part: any) => part.inlineData?.mimeType?.includes('image') && part.inlineData?.data,
     );
